@@ -8,24 +8,23 @@
 library web_scraper;
 
 import 'dart:async';
-
 import 'package:html/parser.dart'; // Contains HTML parsers to generate a Document object.
-import 'package:http/http.dart'; // Contains a client for making API calls.
+import 'package:dio/dio.dart';
 
 import 'validation.dart';
 
 /// WebScraper Main Class.
 class WebScraper {
+  Dio dio = Dio();
+
   // Response Object of web scrapping the website.
-  var _response;
+  Response response;
 
   // Time elapsed in loading in milliseconds.
   int timeElaspsed;
 
   // Base url of the website to be scrapped.
   String baseUrl;
-
-  Map<int, Client> Clients;
 
   /// Creates the web scraper instance.
   WebScraper(String baseUrl) {
@@ -37,15 +36,19 @@ class WebScraper {
   }
 
   /// Loads the webpage into response object.
-  Future<bool> loadWebPage(String route) async {
+  Future<bool> loadWebPage(String route, {Interceptor interceptor}) async {
     if (baseUrl != null || baseUrl != '') {
       final stopwatch = Stopwatch()..start();
-      var client = Client();
 
       try {
-        _response = await client.get(baseUrl + route);
+        if (interceptor != null) {
+          dio.interceptors.add(interceptor);
+          print('interceptor added');
+        }
+        response = await dio.get(baseUrl + route);
+
         // Calculating Time Elapsed using timer from dart:core.
-        if (_response != null) {
+        if (response != null) {
           timeElaspsed = stopwatch.elapsed.inMilliseconds;
           stopwatch.stop();
           stopwatch.reset();
@@ -61,8 +64,8 @@ class WebScraper {
   /// Returns the list of all data enclosed in script tags of the document.
   List<String> getAllScripts() {
     // The _response should not be null (loadWebPage must be called before getAllScripts).
-    assert(_response != null);
-    var document = parse(_response.body);
+    assert(response != null);
+    var document = parse(response.data);
 
     // Quering the list of elements by tag names.
     var scripts = document.getElementsByTagName('script');
@@ -85,8 +88,8 @@ class WebScraper {
   /// method will return {a: ['var a = 15;', 'var a = 9;'], b: ['var b = 10;'] }.
   Map<String, dynamic> getScriptVariables(List<String> variableNames) {
     // The _response should not be null (loadWebPage must be called before getScriptVariables).
-    assert(_response != null);
-    var document = parse(_response.body);
+    assert(response != null);
+    var document = parse(response.data);
 
     // Quering the list of elements by tag names.
     var scripts = document.getElementsByTagName('script');
@@ -122,8 +125,8 @@ class WebScraper {
   }
 
   /// Returns webpage's html in string format.
-  String getPageContent() => _response != null
-      ? _response.body.toString()
+  String getPageContent() => response != null
+      ? response.data.toString()
       : throw WebScraperException(
           'ERROR: Webpage need to be loaded first, try calling loadWebPage');
 
@@ -131,12 +134,12 @@ class WebScraper {
   /// Example address: "div.item > a.title" where item and title are class names of div and a tag respectively.
   List<Map<String, dynamic>> getElement(String address, List<String> attribs) {
     // Attribs are the list of attributes required to extract from the html tag(s) ex. ['href', 'title'].
-    if (_response == null) {
+    if (response == null) {
       throw WebScraperException(
           'getElement cannot be called before loadWebPage');
     }
     // Using html parser and query selector to get a list of particular element.
-    var document = parse(_response.body);
+    var document = parse(response.data);
     var elements = document.querySelectorAll(address);
     // ignore: omit_local_variable_types
     List<Map<String, dynamic>> elementData = [];
